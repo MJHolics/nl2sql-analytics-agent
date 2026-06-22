@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # 단위 테스트는 순수 모듈(sqlutils/evalutils)만 import하므로
+      # BigQuery·LLM·ChromaDB 설치 없이 가볍게 돈다.
+      - name: Install dev tools
+        run: pip install pytest ruff
+      - name: Lint
+        run: ruff check app tests
+      - name: Unit tests
+        run: pytest -q

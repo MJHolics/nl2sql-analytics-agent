@@ -5,17 +5,12 @@
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from google.cloud import bigquery
 
 import config
-
-_SELECT_ONLY = re.compile(r"^\s*(with|select)\b", re.IGNORECASE)
-_FORBIDDEN = re.compile(
-    r"\b(insert|update|delete|merge|drop|create|alter|truncate|grant)\b", re.IGNORECASE
-)
+from app.sqlutils import check_read_only
 
 
 @dataclass
@@ -77,10 +72,9 @@ class BigQueryBackend:
     # --- 검증 / 실행 ---
     def validate(self, sql: str) -> Validation:
         """SELECT 전용 가드 + dry-run으로 문법/컬럼/비용 검증."""
-        if not _SELECT_ONLY.match(sql):
-            return Validation(False, "SELECT/WITH 로 시작하는 조회 쿼리만 허용됩니다.")
-        if _FORBIDDEN.search(sql):
-            return Validation(False, "DML/DDL(쓰기·삭제·생성) 구문은 금지됩니다.")
+        guard = check_read_only(sql)
+        if guard is not None:
+            return Validation(False, guard)
         cfg = bigquery.QueryJobConfig(dry_run=True, use_query_cache=False)
         try:
             job = self.client.query(sql, job_config=cfg)

@@ -1,5 +1,7 @@
 # NL2SQL Analytics Agent — BigQuery 자연어 분석 에이전트
 
+[![CI](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml)
+
 자연어 질문을 **BigQuery Standard SQL로 변환·검증·실행**하고 답을 돌려주는 분석 에이전트입니다.
 핵심은 "그럴듯한 SQL"이 아니라 **검증된 SQL** — 실행 전 dry-run으로 문법·컬럼·비용을 확인하고,
 RAG로 스키마·용어를 그라운딩하며, 평가 하네스로 정확도를 수치화합니다.
@@ -88,6 +90,17 @@ python -m eval.run_eval                         # 평가 지표 출력
 | `app/llm.py` | 제공자 무관 LLM 클라이언트(Gemini/Anthropic/OpenAI) |
 | `knowledge/` | 용어사전 · 예시쿼리(컨텍스트 설계 자산) |
 | `eval/` | 평가셋 + 하네스(validity / answer match) |
+
+## 테스트 / CI
+
+순수 로직(SQL 추출·조회 전용 가드·미지 컬럼 탐지·채점)을 `app/sqlutils.py`·`app/evalutils.py`로
+분리해 네트워크·LLM·BigQuery 없이 단위 테스트한다. GitHub Actions가 push마다 lint(ruff) + pytest를 돌린다.
+
+```bash
+pip install -r requirements-dev.txt
+ruff check app tests
+pytest -q          # 22 passed
+```
 
 ## 한계
 - 다중 턴 대화·후속 질의 메모리는 없습니다(단일 질문 단위).

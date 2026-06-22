@@ -11,12 +11,12 @@
 """
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 
 from app.bq import BigQueryBackend
 from app.llm import LLM
 from app.retriever import Retriever
+from app.sqlutils import extract_sql, find_unknown_columns
 import config
 
 _SYS = """너는 BigQuery Standard SQL을 작성하는 데이터 분석 에이전트다.
@@ -28,15 +28,6 @@ _SYS = """너는 BigQuery Standard SQL을 작성하는 데이터 분석 에이�
 - 오직 조회(SELECT/WITH)만 작성한다. 쓰기·삭제·생성 구문 금지.
 - 큰 스캔을 피하려 필요한 컬럼만 선택하고 합리적으로 LIMIT을 건다.
 - 출력은 SQL 코드 한 블록만. 설명 문장 금지."""
-
-_SQL_BLOCK = re.compile(r"```(?:sql)?\s*(.+?)```", re.IGNORECASE | re.DOTALL)
-
-
-def _extract_sql(text: str) -> str:
-    m = _SQL_BLOCK.search(text)
-    sql = (m.group(1) if m else text).strip()
-    return sql.rstrip(";").strip()
-
 
 @dataclass
 class AgentResult:
@@ -80,11 +71,8 @@ class Nl2SqlAgent:
 
     def _hallucinated_columns(self, sql: str) -> list[str]:
         """`alias.column` 패턴의 컬럼이 데이터셋에 없으면 의심 목록으로."""
-        known = self._known_columns()
-        refs = set(re.findall(r"\b[a-zA-Z_]\w*\.([a-zA-Z_]\w*)\b", sql))
-        # 프로젝트.데이터셋.테이블 의 마지막 토큰(테이블명)은 컬럼이 아니므로 제외
-        suspects = [c for c in refs if c.lower() not in known and c.lower() != "thelook_ecommerce"]
-        return sorted(suspects)
+        # 데이터셋명(테이블 경로의 토큰)은 컬럼이 아니므로 제외
+        return find_unknown_columns(sql, self._known_columns(), skip={self.bq.dataset.lower()})
 
     def _generate_sql(self, question: str, context: str, prior_error: str | None = None) -> str:
         user = f"# 사용 가능한 스키마·용어·예시\n{context}\n\n# 질문\n{question}"
@@ -92,7 +80,7 @@ class Nl2SqlAgent:
             user += (
                 f"\n\n# 직전 시도가 다음 오류로 실패했다. 오류를 고쳐 다시 작성하라.\n{prior_error}"
             )
-        return _extract_sql(self.llm.complete(_SYS, user))
+        return extract_sql(self.llm.complete(_SYS, user))
 
     def answer(self, question: str, summarize: bool = True) -> AgentResult:
         res = AgentResult(question=question)

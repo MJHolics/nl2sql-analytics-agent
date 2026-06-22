@@ -1,0 +1,4 @@
+# 개발/CI 전용. 단위 테스트는 순수 모듈만 다루므로 무거운 런타임 의존성 없이 돈다.
+-r requirements.txt
+pytest>=8.0
+ruff>=0.6
