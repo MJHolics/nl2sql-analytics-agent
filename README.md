@@ -12,6 +12,10 @@ pinned: false
 # NL2SQL Analytics Agent — BigQuery 자연어 분석 에이전트
 
 [![CI](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/🤗%20Live%20Demo-Spaces-yellow)](https://huggingface.co/spaces/appleholics/nl2sql-analytics-agent)
+
+**▶ 라이브 데모:** https://huggingface.co/spaces/appleholics/nl2sql-analytics-agent
+(질문을 입력하면 SQL을 생성·검증·실행합니다. `dry-run` 토글로 비용 0 검증만도 가능.)
 
 자연어 질문을 **BigQuery Standard SQL로 변환·검증·실행**하고 답을 돌려주는 분석 에이전트입니다.
 핵심은 "그럴듯한 SQL"이 아니라 **검증된 SQL** — 실행 전 dry-run으로 문법·컬럼·비용을 확인하고,
