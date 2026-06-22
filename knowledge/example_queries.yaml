@@ -1,0 +1,33 @@
+# 검증된 질문→SQL 예시(few-shot 그라운딩). thelook_ecommerce 공개 데이터셋 기준.
+- question: 카테고리별 총 매출 상위 5개는?
+  sql: |
+    SELECT p.category, ROUND(SUM(oi.sale_price), 2) AS revenue
+    FROM `bigquery-public-data.thelook_ecommerce.order_items` oi
+    JOIN `bigquery-public-data.thelook_ecommerce.products` p
+      ON oi.product_id = p.id
+    GROUP BY p.category
+    ORDER BY revenue DESC
+    LIMIT 5
+
+- question: 2023년 월별 완료 주문 수 추이
+  sql: |
+    SELECT FORMAT_DATE('%Y-%m', created_at) AS month, COUNT(*) AS orders
+    FROM `bigquery-public-data.thelook_ecommerce.orders`
+    WHERE status = 'Complete' AND EXTRACT(YEAR FROM created_at) = 2023
+    GROUP BY month
+    ORDER BY month
+
+- question: 유입 채널별 고객 수
+  sql: |
+    SELECT traffic_source, COUNT(*) AS users
+    FROM `bigquery-public-data.thelook_ecommerce.users`
+    GROUP BY traffic_source
+    ORDER BY users DESC
+
+- question: 국가별 평균 고객 연령 상위 10개
+  sql: |
+    SELECT country, ROUND(AVG(age), 1) AS avg_age, COUNT(*) AS users
+    FROM `bigquery-public-data.thelook_ecommerce.users`
+    GROUP BY country
+    ORDER BY users DESC
+    LIMIT 10

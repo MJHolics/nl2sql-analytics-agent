@@ -1,0 +1,18 @@
+# 업무 용어 → 데이터 의미 매핑(컨텍스트 설계).
+# 분석가가 쓰는 말과 스키마 컬럼 사이의 간극을 메워 NL2SQL 정확도를 높인다.
+- term: 매출(revenue)
+  definition: order_items.sale_price 의 합. 환불/취소를 빼려면 status를 필터링한다.
+- term: 완료 주문
+  definition: orders.status 가 'Complete' 인 주문.
+- term: 취소/반품
+  definition: orders.status 가 'Cancelled' 또는 'Returned'. order_items.status 에도 동일 상태값이 있다.
+- term: 신규 고객
+  definition: users.created_at 기준 가입 시점으로 판단한다.
+- term: 카테고리
+  definition: products.category. 부서 단위는 products.department(Men/Women).
+- term: 객단가(AOV)
+  definition: 평균 주문 금액 = 매출 합 / 주문 수.
+- term: 유입 채널
+  definition: users.traffic_source (Search/Organic/Email/Display/Facebook 등).
+- term: 재고
+  definition: inventory_items 테이블. 판매되면 sold_at 이 채워진다.

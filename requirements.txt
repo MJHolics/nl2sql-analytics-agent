@@ -1,0 +1,9 @@
+# 핵심
+google-cloud-bigquery>=3.25
+chromadb>=0.5
+pyyaml>=6.0
+
+# LLM 제공자(쓰는 것만 설치해도 됨)
+google-genai>=0.3        # Gemini (무료 티어)
+# anthropic>=0.40        # Claude API 쓸 때
+# openai>=1.40           # OpenAI 쓸 때

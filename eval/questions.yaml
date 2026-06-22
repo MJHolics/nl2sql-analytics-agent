@@ -1,0 +1,35 @@
+# 에이전트 평가셋. 두 가지를 측정한다:
+#   1) validity: 생성 SQL이 dry-run을 통과하는가(문법·컬럼·비용)
+#   2) answer_match: gold(검증된 SQL)의 실행 결과와 에이전트 결과가 일치하는가
+# gold_sql 이 있는 항목만 answer_match 채점에 들어간다.
+- question: 카테고리별 총 매출이 가장 높은 카테고리는?
+  gold_sql: |
+    SELECT p.category AS category
+    FROM `bigquery-public-data.thelook_ecommerce.order_items` oi
+    JOIN `bigquery-public-data.thelook_ecommerce.products` p ON oi.product_id = p.id
+    GROUP BY p.category
+    ORDER BY SUM(oi.sale_price) DESC
+    LIMIT 1
+
+- question: 유입 채널 중 고객 수가 가장 많은 채널은?
+  gold_sql: |
+    SELECT traffic_source
+    FROM `bigquery-public-data.thelook_ecommerce.users`
+    GROUP BY traffic_source
+    ORDER BY COUNT(*) DESC
+    LIMIT 1
+
+- question: 전체 사용자 수는 몇 명인가?
+  gold_sql: |
+    SELECT COUNT(*) AS n
+    FROM `bigquery-public-data.thelook_ecommerce.users`
+
+- question: "Women 부서에서 가장 비싼 상품의 소매가(retail_price)는?"
+  gold_sql: |
+    SELECT MAX(retail_price) AS max_price
+    FROM `bigquery-public-data.thelook_ecommerce.products`
+    WHERE department = 'Women'
+
+# gold 없이 validity만 보는(개방형) 질문
+- question: 국가별 평균 고객 연령을 사용자 수가 많은 순으로 보여줘
+- question: 월별 완료 주문 추이를 알려줘
