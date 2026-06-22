@@ -105,16 +105,36 @@ python -m eval.run_eval                         # 평가 지표 출력
 | `app/llm.py` | 제공자 무관 LLM 클라이언트(Gemini/Anthropic/OpenAI) |
 | `knowledge/` | 용어사전 · 예시쿼리(컨텍스트 설계 자산) |
 | `eval/` | 평가셋 + 하네스(validity / answer match) |
+| `app/trace.py` | 요청별 트레이싱(JSONL) + 지표 집계 |
+
+## 관측성 / 트레이싱
+
+각 질문 처리를 한 줄 JSON으로 기록한다 — 생성 SQL 여부·검증/실행 성공·**스캔 바이트(비용)**·
+**지연(ms)**·**자기수정 여부**. 기본은 stdout(`[trace] {...}`)이라 Hugging Face Spaces 로그에 그대로 남고,
+`TRACE_FILE`을 주면 JSONL 파일로도 쌓인다. 쌓인 트레이스는 운영 지표로 집계한다.
+
+```bash
+export TRACE_FILE=traces/trace.jsonl    # 파일에도 기록(선택)
+python cli.py "카테고리별 매출 top 5"
+python -m app.trace traces/trace.jsonl  # 요약: 성공률·repair율·지연 p50/p95·총 스캔 MB
+```
+```json
+{ "count": 12, "success_rate": 0.917, "repair_rate": 0.083,
+  "latency_ms_p50": 1840, "latency_ms_p95": 8470, "total_mb_scanned": 41.2, "avg_rows_ok": 7.5 }
+```
+> "그럴듯한 답"이 아니라 **운영 가능한 답**을 목표로 — 정확도(eval)뿐 아니라 지연·비용·자기수정률을
+> 요청 단위로 측정해 회귀를 감지할 수 있게 했다.
 
 ## 테스트 / CI
 
-순수 로직(SQL 추출·조회 전용 가드·미지 컬럼 탐지·채점)을 `app/sqlutils.py`·`app/evalutils.py`로
-분리해 네트워크·LLM·BigQuery 없이 단위 테스트한다. GitHub Actions가 push마다 lint(ruff) + pytest를 돌린다.
+순수 로직(SQL 추출·조회 전용 가드·미지 컬럼 탐지·채점·트레이스 집계)을 `app/sqlutils.py`·
+`app/evalutils.py`·`app/trace.py`로 분리해 네트워크·LLM·BigQuery 없이 단위 테스트한다.
+GitHub Actions가 push마다 lint(ruff) + pytest를 돌린다.
 
 ```bash
 pip install -r requirements-dev.txt
 ruff check app tests
-pytest -q          # 22 passed
+pytest -q          # 26 passed
 ```
 
 ## 한계

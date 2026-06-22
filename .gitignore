@@ -1,6 +1,8 @@
 .chroma/
+traces/
 __pycache__/
 *.pyc
 .venv/
 .env
 *.log
+sa.json

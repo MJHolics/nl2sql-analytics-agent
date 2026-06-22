@@ -11,12 +11,14 @@
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 from app.bq import BigQueryBackend
 from app.llm import LLM
 from app.retriever import Retriever
 from app.sqlutils import extract_sql, find_unknown_columns
+from app.trace import Tracer, TraceRecord, now_iso
 import config
 
 _SYS = """너는 BigQuery Standard SQL을 작성하는 데이터 분석 에이전트다.
@@ -43,10 +45,11 @@ class AgentResult:
 
 
 class Nl2SqlAgent:
-    def __init__(self) -> None:
+    def __init__(self, tracer: Tracer | None = None) -> None:
         self.bq = BigQueryBackend()
         self.llm = LLM()
         self.retriever = Retriever()
+        self.tracer = tracer or Tracer()
         self._known_cols: set[str] | None = None
         self.schema_text: str = ""
 
@@ -83,6 +86,28 @@ class Nl2SqlAgent:
         return extract_sql(self.llm.complete(_SYS, user))
 
     def answer(self, question: str, summarize: bool = True) -> AgentResult:
+        """공개 진입점: 내부 처리를 시간 측정·트레이싱으로 감싼다."""
+        t0 = time.perf_counter()
+        res = self._answer(question, summarize)
+        self.tracer.emit(
+            TraceRecord(
+                ts=now_iso(),
+                question=question,
+                provider=self.llm.provider,
+                model=self.llm.model,
+                ok=res.ok,
+                latency_ms=int((time.perf_counter() - t0) * 1000),
+                sql_generated=bool(res.sql),
+                repaired=res.repaired,
+                bytes_processed=res.bytes_processed,
+                rows=len(res.rows),
+                warnings=len(res.warnings),
+                error=res.error,
+            )
+        )
+        return res
+
+    def _answer(self, question: str, summarize: bool = True) -> AgentResult:
         res = AgentResult(question=question)
 
         context, top_distance = self.build_context(question)
