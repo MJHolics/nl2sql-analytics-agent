@@ -1,3 +1,14 @@
+---
+title: NL2SQL Analytics Agent
+emoji: 🔎
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 6.19.0
+app_file: app.py
+pinned: false
+---
+
 # NL2SQL Analytics Agent — BigQuery 자연어 분석 에이전트
 
 [![CI](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/MJHolics/nl2sql-analytics-agent/actions/workflows/ci.yml)

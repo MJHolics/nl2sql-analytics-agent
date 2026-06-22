@@ -3,6 +3,9 @@ google-cloud-bigquery>=3.25
 chromadb>=0.5
 pyyaml>=6.0
 
+# 웹 데모(Hugging Face Spaces 진입점 app.py). CLI만 쓰면 불필요.
+gradio>=5.9
+
 # LLM 제공자(쓰는 것만 설치해도 됨)
 google-genai>=0.3        # Gemini (무료 티어)
 # anthropic>=0.40        # Claude API 쓸 때
