@@ -1,0 +1,43 @@
+name: Data Mart Pipeline
+
+# 데이터 마트 자동 갱신 파이프라인 (Cloud Functions + Cloud Scheduler의 무료 등가물).
+# 스케줄로 원본 공개셋에서 마트를 재적재하고, 품질 점검이 실패하면 파이프라인을 실패시킨다.
+on:
+  schedule:
+    - cron: "0 18 * * *"   # 매일 03:00 KST (UTC 18:00) 마트 갱신
+  workflow_dispatch: {}     # 수동 실행 버튼
+
+jobs:
+  refresh-mart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # 마트 갱신은 BigQuery만 필요(LLM 불필요) — 가볍게 설치한다.
+      - name: Install deps
+        run: pip install google-cloud-bigquery
+
+      # 서비스계정 시크릿이 있으면 자격증명 파일로 노출, 없으면(포크 등) 본작업을 건너뛴다.
+      - name: Configure GCP credentials
+        id: gcp
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "::notice::GCP_SA_KEY 미설정 — 파이프라인 본작업을 건너뜁니다(시크릿 없음)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "$GCP_SA_KEY" > "$RUNNER_TEMP/sa.json"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          fi
+
+      # 마트 재적재 + 품질 점검. build_mart.py는 품질 위반 시 비-0으로 종료 → 이 스텝이
+      # 실패하고 파이프라인이 빨갛게 뜬다(품질 게이트).
+      - name: Refresh data mart + quality gate
+        if: steps.gcp.outputs.skip != 'true'
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: python build_mart.py

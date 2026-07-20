@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 
 from app.agent import Nl2SqlAgent
+from app.conversation import Conversation, Turn
 
 
 def _show(res) -> None:
@@ -38,21 +39,26 @@ def main() -> None:
     print("스키마 그라운딩 인덱스 구축 중…")
     agent.setup()
 
+    conv = Conversation()
+
     def ask(q: str) -> None:
         if args.dry_run:
             ctx, _ = agent.build_context(q)
-            sql = agent._generate_sql(q, ctx)
+            sql = agent._generate_sql(q, ctx, history=conv.history())
             val = agent.bq.validate(sql)
             print("\n-- 생성 SQL --\n" + sql)
             print(("✓ 검증 통과, 예상 스캔 %.1fMB" % (val.gb * 1024)) if val.ok else f"✗ {val.error}")
-        else:
-            _show(agent.answer(q))
+            return
+        res = agent.answer(q, history=conv.history())
+        _show(res)
+        # 후속질의 해석을 위해 성공 턴을 세션 이력에 기록
+        conv.record(Turn(question=q, sql=res.sql, answer=res.answer, ok=res.ok))
 
     if args.question:
         ask(" ".join(args.question))
         return
 
-    print("질문을 입력하세요(빈 줄/Ctrl-C 종료).")
+    print("질문을 입력하세요(빈 줄/Ctrl-C 종료). 대화형에서는 후속 질문이 직전 답을 기억합니다.")
     while True:
         try:
             q = input("\n> ").strip()

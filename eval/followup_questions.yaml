@@ -1,0 +1,45 @@
+# 멀티턴 후속질의 평가셋.
+# 각 항목은 하나의 "대화"다. turns 를 순서대로 진행하며 직전 답을 이력으로 쌓는다.
+# gold_sql 이 달린 턴이 "채점 대상 후속질의"다 — 그 질문만 떼어 보면
+# ("그중 상위 3개만", "Men 부서는?") 무엇을 가리키는지 알 수 없으므로,
+# 직전 대화를 기억하지 못하면 풀 수 없다. 이력 있음 vs 없음을 같은 gold 로 비교한다.
+- name: 카테고리 매출 → 상위 3개
+  turns:
+    - question: 카테고리별 총 매출을 높은 순으로 보여줘
+    - question: 그중 상위 3개만 보여줘
+      gold_sql: |
+        SELECT p.category AS category, SUM(oi.sale_price) AS revenue
+        FROM `bigquery-public-data.thelook_ecommerce.order_items` oi
+        JOIN `bigquery-public-data.thelook_ecommerce.products` p ON oi.product_id = p.id
+        GROUP BY p.category
+        ORDER BY revenue DESC
+        LIMIT 3
+
+- name: 유입 채널별 고객 수 → 1위만
+  turns:
+    - question: 유입 채널별 고객 수를 알려줘
+    - question: 가장 많은 채널 하나만
+      gold_sql: |
+        SELECT traffic_source
+        FROM `bigquery-public-data.thelook_ecommerce.users`
+        GROUP BY traffic_source
+        ORDER BY COUNT(*) DESC
+        LIMIT 1
+
+- name: 부서별 평균가 → 필터 전환(Women→Men)
+  turns:
+    - question: Women 부서 상품의 평균 소매가(retail_price)는?
+    - question: Men 부서는?
+      gold_sql: |
+        SELECT AVG(retail_price) AS avg_price
+        FROM `bigquery-public-data.thelook_ecommerce.products`
+        WHERE department = 'Men'
+
+- name: 사용자 수 → 연령 조건 추가
+  turns:
+    - question: 전체 사용자 수는?
+    - question: 그중 30세 이상은 몇 명이야?
+      gold_sql: |
+        SELECT COUNT(*) AS n
+        FROM `bigquery-public-data.thelook_ecommerce.users`
+        WHERE age >= 30

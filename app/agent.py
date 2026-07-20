@@ -29,6 +29,8 @@ _SYS = """너는 BigQuery Standard SQL을 작성하는 데이터 분석 에이�
   자리표시자를 절대 그대로 쓰지 말고, 스키마의 실제 이름으로 채운다.
 - 오직 조회(SELECT/WITH)만 작성한다. 쓰기·삭제·생성 구문 금지.
 - 큰 스캔을 피하려 필요한 컬럼만 선택하고 합리적으로 LIMIT을 건다.
+- 직전 대화가 주어지면, 후속 질문("그중 상위 3개", "카테고리별로 다시")은 직전 SQL을
+  참고·수정해 답한다. 단, 직전 대화와 **무관한 새 질문이면 직전 대화를 무시**하고 새로 작성한다.
 - 출력은 SQL 코드 한 블록만. 설명 문장 금지."""
 
 @dataclass
@@ -77,18 +79,30 @@ class Nl2SqlAgent:
         # 데이터셋명(테이블 경로의 토큰)은 컬럼이 아니므로 제외
         return find_unknown_columns(sql, self._known_columns(), skip={self.bq.dataset.lower()})
 
-    def _generate_sql(self, question: str, context: str, prior_error: str | None = None) -> str:
-        user = f"# 사용 가능한 스키마·용어·예시\n{context}\n\n# 질문\n{question}"
+    def _generate_sql(
+        self,
+        question: str,
+        context: str,
+        prior_error: str | None = None,
+        history: str = "",
+    ) -> str:
+        user = f"# 사용 가능한 스키마·용어·예시\n{context}"
+        if history:
+            user += f"\n\n# 직전 대화(후속 질문이면 참고, 무관하면 무시)\n{history}"
+        user += f"\n\n# 질문\n{question}"
         if prior_error:
             user += (
                 f"\n\n# 직전 시도가 다음 오류로 실패했다. 오류를 고쳐 다시 작성하라.\n{prior_error}"
             )
         return extract_sql(self.llm.complete(_SYS, user))
 
-    def answer(self, question: str, summarize: bool = True) -> AgentResult:
-        """공개 진입점: 내부 처리를 시간 측정·트레이싱으로 감싼다."""
+    def answer(self, question: str, summarize: bool = True, history: str = "") -> AgentResult:
+        """공개 진입점: 내부 처리를 시간 측정·트레이싱으로 감싼다.
+
+        history: 직전 대화 컨텍스트(후속질의 해석용). 빈 문자열이면 단일턴과 동일.
+        """
         t0 = time.perf_counter()
-        res = self._answer(question, summarize)
+        res = self._answer(question, summarize, history)
         self.tracer.emit(
             TraceRecord(
                 ts=now_iso(),
@@ -107,7 +121,7 @@ class Nl2SqlAgent:
         )
         return res
 
-    def _answer(self, question: str, summarize: bool = True) -> AgentResult:
+    def _answer(self, question: str, summarize: bool = True, history: str = "") -> AgentResult:
         res = AgentResult(question=question)
 
         context, top_distance = self.build_context(question)
@@ -116,7 +130,7 @@ class Nl2SqlAgent:
                 f"근거가 빈약합니다(거리 {top_distance:.2f}). 질문이 데이터 범위 밖일 수 있습니다."
             )
 
-        sql = self._generate_sql(question, context)
+        sql = self._generate_sql(question, context, history=history)
         if not sql:
             res.error = "에이전트가 답할 근거를 찾지 못해 SQL 생성을 거부했습니다."
             return res
@@ -124,7 +138,7 @@ class Nl2SqlAgent:
         # 1차 검증 → 실패 시 오류를 피드백해 1회 자기수정
         val = self.bq.validate(sql)
         if not val.ok:
-            repaired = self._generate_sql(question, context, prior_error=val.error)
+            repaired = self._generate_sql(question, context, prior_error=val.error, history=history)
             if repaired and repaired != sql:
                 rval = self.bq.validate(repaired)
                 if rval.ok:

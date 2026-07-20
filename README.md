@@ -88,10 +88,54 @@ pip install -r requirements.txt
 
 python cli.py "카테고리별 총 매출 상위 5개는?"
 python cli.py --dry-run "유입 채널별 고객 수"   # 실행 없이 SQL 생성·검증만(비용 0)
-python cli.py                                  # 대화형
+python cli.py                                  # 대화형(후속 질문이 직전 답을 기억 — 멀티턴)
 
-python -m eval.run_eval                         # 평가 지표 출력
+python -m eval.run_eval                         # validity / answer-match 지표
+python -m eval.run_followup_eval                # 멀티턴 후속질의 정확도(메모리 있음 vs 없음)
 ```
+
+### 데이터 마트 — staging 뷰 + 사전집계 테이블 (스캔 절감)
+
+원본은 읽기전용 공개셋이라, 마트는 **본인 프로젝트의 데이터셋**(`config.MART_DATASET`)에 만든다(BigQuery 샌드박스에서 무료). **staging은 뷰**(저장 0, 업무 용어로 핵심 컬럼만 노출하는 의미 계층)이고, **mart는 사전집계 테이블**(CTAS)이다. 작은 요약 테이블이라 조회 시 원본 전체(수백 MB) 대신 수 KB만 스캔한다.
+
+```bash
+python build_mart.py            # staging 뷰 + 집계 마트 생성 + 품질 점검 + 스캔 비교
+python build_mart.py --compare  # 원본 직접쿼리 vs 마트 경유 스캔 바이트(dry-run, 비용 0)
+```
+
+DDL은 `mart/`(staging·marts·quality_checks `.sql`)에 버전관리하고, 템플릿 렌더링·문장 분리는 순수 함수라 오프라인 단위테스트된다(`app/mart.py`, `tests/test_mart.py`). 품질 점검(키 NULL·음수 매출·완료>전체 모순·빈 테이블)이 마트 운영의 무결성을 수치로 보장한다.
+
+### 파이프라인 자동화 — GitHub Actions 스케줄
+
+`.github/workflows/pipeline.yml`이 마트를 **매일 스케줄(+수동 트리거)로 재적재**하고, 품질 점검이 실패하면 파이프라인을 실패시킨다(품질 게이트). 이는 **Cloud Functions + Cloud Scheduler의 무료 등가물** — 카드 등록 없이 "수집→적재→마트화 자동화"를 증명한다. BigQuery 서비스계정(`GCP_SA_KEY`)·프로젝트(`GOOGLE_CLOUD_PROJECT`)를 레포 Secret으로 두면 동작하고, 없으면 안전하게 건너뛴다(LLM 키 불필요 — 마트 갱신은 결정적).
+
+### 배포 준비 — Cloud Run / Terraform / Vertex-ready
+
+비용 0 원칙이라 클라우드에 **적용(apply)하지는 않지만**, 배포 가능한 구조를 코드로 갖췄다:
+- **`Dockerfile`** — `$PORT`를 읽는 Cloud Run-ready 컨테이너(HF Spaces는 자체 빌드라 별도).
+- **`infra/main.tf`** — BigQuery 마트 데이터셋 + Cloud Run 서비스 Terraform 정의(미적용 IaC). `infra/README.md` 참조.
+- **Vertex-ready** — `app/llm.py`에 `LLM_PROVIDER=vertex` 분기. provider 무관 클라이언트라 무료 Gemini 키 ↔ Vertex AI Gemini가 **환경변수 한 줄**로 전환된다(이노션 "Vertex AI" 요구의 엔터프라이즈 경로).
+
+> 라이브 클라우드 URL이 없는 부분은 숨기지 않는다 — "카드만 연결하면 `terraform apply`로 그대로 배포되는 구조". 무료 운영(BQ 샌드박스·HF Spaces·GitHub Actions)은 그대로 유지된다.
+
+### 관측성 — 트레이스 → 운영 대시보드
+
+각 요청은 JSONL로 트레이싱된다(`app/trace.py`: 성공/지연/스캔바이트/자기수정). 누적 트레이스를 운영 지표·대시보드로 집계한다(Cloud Monitoring의 무료 등가물):
+
+```bash
+python -m app.trace traces/trace.jsonl            # 요약 지표(JSON): 성공률·p50/p95·총 스캔
+python -m app.trace traces/trace.jsonl --html     # 정적 HTML 대시보드 생성(무의존)
+```
+
+HTML 렌더링은 순수 함수라 오프라인 단위테스트되고(XSS 이스케이프 포함, `tests/test_trace.py`), 외부 의존성 없이 브라우저로 운영 현황을 본다.
+
+### 의미 기반(semantic) 캐시 — 패러프레이즈도 히트
+
+`app/semantic_cache.py`는 정확 일치를 넘어 **질의 임베딩의 코사인 유사도가 임계 이상이면 캐시 히트**시킨다. "카테고리별 매출"과 "카테고리 별 매출액"을 다른 키로 보는 정확 캐시와 달리, 패러프레이즈에도 히트해 LLM/실행 호출을 줄인다(비용·지연↓). 코사인·LRU·TTL은 순수 로직이라 오프라인 단위테스트되고(`tests/test_semantic_cache.py`), 임베더는 주입형(무료 BGE-M3/Gemini). SQL 생성 결과를 질의 *의미*로 캐싱하는 운영 옵션.
+
+### 멀티턴 — 후속 질문이 직전 답을 기억
+
+대화형 CLI는 세션 이력을 들고 다닌다(`app/conversation.py`). "카테고리별 매출 top5"에 이어 **"그중 상위 3개만"**처럼 단독으로는 불완전한 후속 질문을, 직전 SQL을 참고해 해석한다. 에이전트 자체는 무상태이고(`answer(..., history=...)`), 이력 렌더링은 순수 함수라 오프라인 단위테스트된다(`tests/test_conversation.py`). 무관한 새 질문이면 직전 대화를 무시하도록 프롬프트로 지시한다. `eval/run_followup_eval.py`가 **이력 있음 vs 없음**을 같은 gold 로 비교해 멀티턴의 이득을 수치화한다.
 
 ---
 

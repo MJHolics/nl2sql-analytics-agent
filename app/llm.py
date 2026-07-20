@@ -1,6 +1,8 @@
-"""제공자 무관 LLM 클라이언트. Gemini(무료 티어) 기본, Anthropic·OpenAI 옵션.
+"""제공자 무관 LLM 클라이언트. Gemini(무료 티어) 기본, Vertex·Anthropic·OpenAI 옵션.
 
 키 자동 선택 우선순위(LLM_PROVIDER=auto): gemini → anthropic → openai.
+Vertex(엔터프라이즈)는 명시적으로 LLM_PROVIDER=vertex 일 때만 쓴다 — API 키가 아니라
+GCP ADC(서비스계정/gcloud)로 인증하고 과금되므로 자동선택에는 넣지 않는다.
 각 SDK는 실제 사용하는 제공자만 설치하면 된다.
 """
 from __future__ import annotations
@@ -36,9 +38,12 @@ class LLM:
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
         """system+user 프롬프트로 한 번 호출하고 텍스트만 반환.
         무료 티어 rate limit(429) 시 서버가 알려준 지연만큼 기다려 재시도."""
-        fn = {"gemini": self._gemini, "anthropic": self._anthropic, "openai": self._openai}.get(
-            self.provider
-        )
+        fn = {
+            "gemini": self._gemini,
+            "vertex": self._vertex,
+            "anthropic": self._anthropic,
+            "openai": self._openai,
+        }.get(self.provider)
         if fn is None:
             raise ValueError(f"알 수 없는 provider: {self.provider}")
         last: Exception | None = None
@@ -64,6 +69,31 @@ class LLM:
 
             key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             self._client = genai.Client(api_key=key)
+        from google.genai import types
+
+        resp = self._client.models.generate_content(
+            model=self.model,
+            contents=user,
+            config=types.GenerateContentConfig(
+                system_instruction=system, temperature=temperature
+            ),
+        )
+        return (resp.text or "").strip()
+
+    def _vertex(self, system: str, user: str, temperature: float) -> str:
+        """Vertex AI Gemini. 같은 google-genai SDK를 vertexai 모드로 쓴다(API 키 대신 ADC).
+
+        이노션류 'Vertex AI' 요구의 엔터프라이즈 경로 — 무료 Gemini 키 코드와 한 줄 차이로
+        전환된다(provider 무관 설계). 인증은 GCP ADC, 청구는 GOOGLE_CLOUD_PROJECT.
+        """
+        if self._client is None:
+            from google import genai
+
+            self._client = genai.Client(
+                vertexai=True,
+                project=os.getenv("GOOGLE_CLOUD_PROJECT"),
+                location=config.VERTEX_LOCATION,
+            )
         from google.genai import types
 
         resp = self._client.models.generate_content(

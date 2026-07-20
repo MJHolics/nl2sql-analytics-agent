@@ -33,15 +33,21 @@ BILLING_PROJECT: str | None = os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GC
 SOURCE_DATASET: str = os.getenv("SOURCE_DATASET", "bigquery-public-data.thelook_ecommerce")
 # dry-run에서 이 바이트를 넘기면 실행 거부(비용 가드레일). 기본 2GB.
 MAX_BYTES_BILLED: int = int(os.getenv("MAX_BYTES_BILLED", str(2 * 1024**3)))
+# 데이터 마트를 만들 본인 프로젝트의 데이터셋명(원본은 읽기전용 공개셋이라 여기 따로 생성).
+MART_DATASET: str = os.getenv("MART_DATASET", "nl2sql_mart")
 
 # --- LLM ---
-# provider: gemini | anthropic | openai | auto(키 있는 것 자동 선택)
+# provider: gemini | vertex | anthropic | openai | auto(키 있는 것 자동 선택)
+#   gemini : 무료 API 키(기본·비용 0)   vertex : Vertex AI Gemini(엔터프라이즈, ADC 인증·과금)
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "auto")
 LLM_MODEL: dict[str, str] = {
     "gemini": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    "vertex": os.getenv("VERTEX_MODEL", "gemini-2.5-flash"),
     "anthropic": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
     "openai": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
 }
+# Vertex AI 리전(LLM_PROVIDER=vertex 일 때). 인증은 GCP ADC(서비스계정/gcloud).
+VERTEX_LOCATION: str = os.getenv("VERTEX_LOCATION", "us-central1")
 
 # --- RAG 그라운딩 ---
 CHROMA_DIR: str = os.getenv("CHROMA_DIR", os.path.join(os.path.dirname(__file__), ".chroma"))

@@ -3,7 +3,15 @@ from __future__ import annotations
 
 import json
 
-from app.trace import TraceRecord, Tracer, _percentile, load_traces, now_iso, summarize
+from app.trace import (
+    TraceRecord,
+    Tracer,
+    _percentile,
+    load_traces,
+    now_iso,
+    render_html,
+    summarize,
+)
 
 
 def _rec(ok=True, latency=100, repaired=False, bytes_=0, rows=0):
@@ -54,3 +62,16 @@ def test_tracer_writes_jsonl(tmp_path):
     # 각 줄이 유효한 JSON인지
     for line in path.read_text(encoding="utf-8").splitlines():
         json.loads(line)
+
+
+def test_render_html_contains_metrics_and_escapes():
+    recs = [
+        {"ts": "t1", "question": "정상 질문", "ok": True, "latency_ms": 100, "bytes_processed": 1024**2},
+        {"ts": "t2", "question": "<script>주입</script>", "ok": False, "latency_ms": 9, "error": "boom"},
+    ]
+    out = render_html(summarize(recs), recs)
+    assert "<table" in out and "운영 지표" in out
+    assert "정상 질문" in out
+    # HTML 이스케이프로 XSS 방지(원시 <script> 가 그대로 들어가면 안 됨)
+    assert "<script>주입" not in out
+    assert "&lt;script&gt;" in out

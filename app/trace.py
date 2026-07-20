@@ -78,6 +78,52 @@ def summarize(records: list[dict]) -> dict:
     }
 
 
+def render_html(summary: dict, records: list[dict]) -> str:
+    """요약 지표 + 최근 요청 표를 담은 정적 HTML 대시보드(순수 함수, 무의존).
+
+    Cloud Monitoring의 무료 등가물 — JSONL 트레이스를 브라우저로 볼 수 있는 한 페이지로.
+    """
+    import html as _html
+
+    def esc(v: object) -> str:
+        return _html.escape(str(v))
+
+    cards = [
+        ("요청 수", summary.get("count", 0)),
+        ("성공률", f"{summary.get('success_rate', 0):.0%}"),
+        ("자기수정률", f"{summary.get('repair_rate', 0):.0%}"),
+        ("지연 p50", f"{summary.get('latency_ms_p50', 0)} ms"),
+        ("지연 p95", f"{summary.get('latency_ms_p95', 0)} ms"),
+        ("총 스캔", f"{summary.get('total_mb_scanned', 0)} MB"),
+    ]
+    card_html = "".join(
+        f'<div class="card"><div class="v">{esc(v)}</div><div class="k">{esc(k)}</div></div>'
+        for k, v in cards
+    )
+    cols = ["ts", "question", "ok", "latency_ms", "bytes_processed", "repaired", "error"]
+    head = "".join(f"<th>{esc(c)}</th>" for c in cols)
+    body_rows = []
+    for r in records[-50:][::-1]:  # 최근 50건, 최신 위로
+        cells = "".join(f"<td>{esc(r.get(c, ''))}</td>" for c in cols)
+        body_rows.append(f"<tr class=\"{'ok' if r.get('ok') else 'fail'}\">{cells}</tr>")
+    table = "".join(body_rows)
+    return f"""<!doctype html><html lang="ko"><meta charset="utf-8">
+<title>NL2SQL — 운영 대시보드</title>
+<style>
+ body{{font-family:system-ui,'Malgun Gothic',sans-serif;margin:24px;color:#1a1a2e}}
+ h1{{font-size:20px}} .cards{{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}}
+ .card{{background:#f4f6fb;border-radius:10px;padding:14px 18px;min-width:110px}}
+ .card .v{{font-size:22px;font-weight:700}} .card .k{{font-size:12px;color:#555}}
+ table{{border-collapse:collapse;width:100%;font-size:13px}}
+ th,td{{border-bottom:1px solid #eee;padding:6px 8px;text-align:left;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+ tr.fail td{{background:#fff3f3}} th{{background:#fafafa}}
+</style>
+<h1>🔎 NL2SQL Analytics Agent — 운영 지표</h1>
+<div class="cards">{card_html}</div>
+<table><thead><tr>{head}</tr></thead><tbody>{table}</tbody></table>
+</html>"""
+
+
 def load_traces(path: str) -> list[dict]:
     """JSONL 파일을 레코드 리스트로 읽는다."""
     out: list[dict] = []
@@ -90,14 +136,25 @@ def load_traces(path: str) -> list[dict]:
 
 
 def _main() -> None:
-    """python -m app.trace [경로] → 트레이스 요약 지표를 출력."""
+    """python -m app.trace [경로] [--html [출력.html]] → 요약 지표 출력 / HTML 대시보드 생성."""
     import sys
 
-    path = sys.argv[1] if len(sys.argv) > 1 else os.getenv("TRACE_FILE", "traces/trace.jsonl")
+    args = [a for a in sys.argv[1:] if a != "--html"]
+    want_html = "--html" in sys.argv
+    path = args[0] if args else os.getenv("TRACE_FILE", "traces/trace.jsonl")
     if not os.path.exists(path):
         print(f"트레이스 파일이 없습니다: {path}")
         return
-    print(json.dumps(summarize(load_traces(path)), ensure_ascii=False, indent=2))
+    records = load_traces(path)
+    summary = summarize(records)
+    if want_html:
+        out = args[1] if len(args) > 1 else "traces/dashboard.html"
+        os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
+        with open(out, "w", encoding="utf-8") as f:
+            f.write(render_html(summary, records))
+        print(f"대시보드 생성: {out}  (요청 {summary.get('count', 0)}건)")
+    else:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

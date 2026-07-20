@@ -153,4 +153,5 @@ with gr.Blocks(title="NL2SQL Analytics Agent") as demo:
 
 
 if __name__ == "__main__":
-    demo.launch()
+    # Cloud Run 등은 $PORT로 리슨 포트를 지정한다(없으면 gradio 기본 7860).
+    demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", "7860")))
