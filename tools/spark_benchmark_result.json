@@ -1,0 +1,92 @@
+[
+  {
+    "n_rows": 10000,
+    "groupby_s": {
+      "pandas": 0.008132590000002438,
+      "spark": 0.48949020500000984,
+      "spark_wins": false
+    },
+    "join_s": {
+      "pandas": 0.005173847999998316,
+      "spark": 1.2218265529999996,
+      "spark_wins": false
+    },
+    "window_s": {
+      "pandas": 0.005909279999997352,
+      "spark": 0.12506334100001482,
+      "spark_wins": false
+    }
+  },
+  {
+    "n_rows": 100000,
+    "groupby_s": {
+      "pandas": 0.014154032000021743,
+      "spark": 0.13940584200000217,
+      "spark_wins": false
+    },
+    "join_s": {
+      "pandas": 0.014995547000012266,
+      "spark": 0.35303059099999246,
+      "spark_wins": false
+    },
+    "window_s": {
+      "pandas": 0.01656627599999183,
+      "spark": 0.08179880699998421,
+      "spark_wins": false
+    }
+  },
+  {
+    "n_rows": 1000000,
+    "groupby_s": {
+      "pandas": 0.056158775000000105,
+      "spark": 0.19559162999999558,
+      "spark_wins": false
+    },
+    "join_s": {
+      "pandas": 0.1630663309999818,
+      "spark": 0.8665396359999988,
+      "spark_wins": false
+    },
+    "window_s": {
+      "pandas": 0.22958844000001477,
+      "spark": 0.08213566899999591,
+      "spark_wins": true
+    }
+  },
+  {
+    "n_rows": 5000000,
+    "groupby_s": {
+      "pandas": 0.34005012100001863,
+      "spark": 0.2218764120000003,
+      "spark_wins": true
+    },
+    "join_s": {
+      "pandas": 0.8003527150000025,
+      "spark": 1.4349603320000028,
+      "spark_wins": false
+    },
+    "window_s": {
+      "pandas": 1.416434052000028,
+      "spark": 0.0876777059999938,
+      "spark_wins": true
+    }
+  },
+  {
+    "n_rows": 20000000,
+    "groupby_s": {
+      "pandas": 1.0858048779999763,
+      "spark": 0.5465886140000009,
+      "spark_wins": true
+    },
+    "join_s": {
+      "pandas": 3.303787540000002,
+      "spark": 4.2294825179999975,
+      "spark_wins": false
+    },
+    "window_s": {
+      "pandas": 5.670003183000006,
+      "spark": 0.06021505100000013,
+      "spark_wins": true
+    }
+  }
+]
