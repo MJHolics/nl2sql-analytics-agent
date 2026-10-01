@@ -16,7 +16,7 @@ jobs:
       # 단위 테스트는 순수 모듈(sqlutils/evalutils)만 import하므로
       # BigQuery·LLM·ChromaDB 설치 없이 가볍게 돈다.
       - name: Install dev tools
-        run: pip install pytest ruff
+        run: pip install pytest "ruff==0.16.9"
       - name: Lint
         run: ruff check app tests
       - name: Unit tests
