@@ -114,7 +114,7 @@ DDL은 `mart/`(staging·marts·quality_checks `.sql`)에 버전관리하고, 템
 비용 0 원칙이라 클라우드에 **적용(apply)하지는 않지만**, 배포 가능한 구조를 코드로 갖췄다:
 - **`Dockerfile`** — `$PORT`를 읽는 Cloud Run-ready 컨테이너(HF Spaces는 자체 빌드라 별도).
 - **`infra/main.tf`** — BigQuery 마트 데이터셋 + Cloud Run 서비스 Terraform 정의(미적용 IaC). `infra/README.md` 참조.
-- **Vertex-ready** — `app/llm.py`에 `LLM_PROVIDER=vertex` 분기. provider 무관 클라이언트라 무료 Gemini 키 ↔ Vertex AI Gemini가 **환경변수 한 줄**로 전환된다(이노션 "Vertex AI" 요구의 엔터프라이즈 경로).
+- **Vertex-ready** — `app/llm.py`에 `LLM_PROVIDER=vertex` 분기. provider 무관 클라이언트라 무료 Gemini 키 ↔ Vertex AI Gemini가 **환경변수 한 줄**로 전환된다(Vertex AI를 쓰는 엔터프라이즈 경로).
 
 > 라이브 클라우드 URL이 없는 부분은 숨기지 않는다 — "카드만 연결하면 `terraform apply`로 그대로 배포되는 구조". 무료 운영(BQ 샌드박스·HF Spaces·GitHub Actions)은 그대로 유지된다.
 
@@ -184,7 +184,7 @@ pytest -q          # 26 passed
 ## 대용량 데이터 — pandas vs PySpark, 연산별 크로스오버 실측 (2026-09-14)
 
 이 프로젝트의 대용량 처리는 전부 BigQuery(관리형 SQL)를 통해서였다. Spark 자체를 붙여
-"대용량 데이터(Spark 등)"를 요구하는 공고(디오 AI Platform 데이터 엔지니어 등)의 갭을
+"대용량 데이터(Spark 등)" 경험이 없던 갭을
 닫았다 — WSL2에 Java 17 + PySpark 3.5.3을 로컬(`local[*]`, 클러스터·클라우드 계정 불필요)로
 설치해 **"Spark가 빠르다"는 막연한 주장 대신 연산 3종(groupby·join·window)마다 크로스오버
 지점을 따로 쟀다.**

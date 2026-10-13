@@ -83,7 +83,7 @@ class LLM:
     def _vertex(self, system: str, user: str, temperature: float) -> str:
         """Vertex AI Gemini. 같은 google-genai SDK를 vertexai 모드로 쓴다(API 키 대신 ADC).
 
-        이노션류 'Vertex AI' 요구의 엔터프라이즈 경로 — 무료 Gemini 키 코드와 한 줄 차이로
+        Vertex AI를 쓰는 엔터프라이즈 경로 — 무료 Gemini 키 코드와 한 줄 차이로
         전환된다(provider 무관 설계). 인증은 GCP ADC, 청구는 GOOGLE_CLOUD_PROJECT.
         """
         if self._client is None:
